@@ -20,27 +20,27 @@ class Mentor {
         
         this.af = {
             prev: 0.02,
-            curr: NaN
+            curr: undefined
         };
 
         this.psar = {
-            prev: NaN,
-            curr: NaN
+            prev: undefined,
+            curr: undefined
         };
         
         this.ep = {
-            prev: NaN,
-            curr: NaN
+            prev: undefined,
+            curr: undefined
         };
         
         this.deff_asset = {
-            prev: NaN,
-            curr: NaN
+            prev: undefined,
+            curr: undefined
         };
         
         this.trend = {
-            prev: NaN,
-            curr: NaN
+            prev: undefined,
+            curr: undefined
         };
 
         this.high;
@@ -57,13 +57,19 @@ class Mentor {
             this.trend.curr = "up"
         }
 
-        if ( this.psar.curr < this.low ) {
+        else if ( this.psar.curr > this.low ) {
             this.trend.curr = "down"
         } 
 
     }
 
     caPsar = () => {
+
+        if( this.psar.prev == undefined && this.psar.curr == undefined  ) { 
+            this.psar.prev = this.low;
+            this.psar.curr = this.low;
+            return;
+        }
         
         if ( this.trend.prev == "up" && ( this.psar.prev + this.deff_asset.prev ) > this.low ) {
             this.psar.curr = this.ep.prev;
@@ -80,20 +86,26 @@ class Mentor {
     }
 
     caEp = () => {
+
+        if( this.ep.prev == undefined && this.ep.curr == undefined ) {
+            this.ep.prev = this.high;
+            this.ep.curr = this.high;
+            return;
+        }
         
         if ( this.trend.curr == "up" && this.high > this.ep.prev ) {
             this.ep.curr = this.high
         }
 
-        if ( this.trend.curr == "up" && this.high <= this.ep.prev ) {
+        else if ( this.trend.curr == "up" && this.high <= this.ep.prev ) {
             this.ep.curr = this.ep.prev
         }
 
-        if ( this.trend.curr == "down" && this.low < this.ep.prev ) {
+        else if ( this.trend.curr == "down" && this.low < this.ep.prev ) {
             this.ep.curr = this.low
         }
 
-        if ( this.trend.curr == "down" && this.low >= this.ep.prev ) {
+        else if ( this.trend.curr == "down" && this.low >= this.ep.prev ) {
             this.ep.curr = this.ep.prev
         }
     }
@@ -101,35 +113,43 @@ class Mentor {
 
     caAf = () => {
 
+        
         if( this.trend.prev == this.trend.curr ) {
-            
             if ( this.af.prev == this.afmax) {
                 this.af.curr = this.afmax
             }
+        }
 
-            if( this.trend.curr == "up" && this.ep.curr > this.ep.prev ) {
-                this.af.curr = this.af.prev + this.afmin
-            }
+        else if( this.trend.curr == "up" && this.ep.curr > this.ep.prev ) {
+            this.af.curr = this.af.prev + this.afmin
+        }
 
-            if( this.trend.curr == "up" && this.ep.curr <= this.ep.prev ) {
-                this.af.curr = this.af.prev
-            }
+        else if( this.trend.curr == "up" && this.ep.curr <= this.ep.prev ) {
+            this.af.curr = this.af.prev
+        }
 
-            if( this.trend.curr == "down" && this.ep.curr < this.ep.prev ) {
-                this.af.curr = this.af.prev + this.afmin
-            }
+        else if( this.trend.curr == "down" && this.ep.curr < this.ep.prev ) {
+            this.af.curr = this.af.prev + this.afmin
+        }
 
-            if( this.trend.curr == "down" && this.ep.curr >= this.ep.prev ) {
-                this.af.curr = this.af.prev 
-            }
+        else if( this.trend.curr == "down" && this.ep.curr >= this.ep.prev ) {
+            this.af.curr = this.af.prev 
+        }
             
-        } else {
+         else {
             this.af.curr = this.afmin;
         }
 
     }
 
     caDeff = () => {
+        
+        if( this.deff_asset.prev == undefined && this.deff_asset.curr == undefined ) { 
+            this.deff_asset.prev = (this.ep.prev - this.psar.prev) * this.af.prev;
+            this.deff_asset.curr = (this.ep.curr - this.psar.curr) * this.af.curr;
+            return; 
+        }
+        
         this.deff_asset.curr = ( this.ep.curr - this.psar.curr ) * this.af.curr;
     }
 
@@ -156,22 +176,12 @@ class Mentor {
         this.high = result.tick?.high;
         this.low = result.tick?.low;
         
-        // In case we don't have previous values 
-        if( !this.psar.prev ) this.psar.prev = this.low;
-        if( !this.ep.prev ) this.ep.prev = this.high;
-        if( !this.deff_asset.prev ) this.deff_asset.prev = (this.ep.prev - this.psar.prev) * this.af.prev;
-
-        // In case we don't have current values 
-        if( !this.psar.curr ) this.psar.curr = this.low;
-        if( !this.ep.curr ) this.ep.curr = this.high;
-        if( !this.deff_asset.curr ) this.deff_asset.curr = (this.ep.curr - this.psar.curr) * this.af.curr;
-
         // Start calculation
-        this.caDeff()
         this.caPsar();
         this.caTrend();
         this.caEp();
         this.caAf();
+        this.caDeff()
         
         // Get the current market price 
         const marketResult = await fetch(`https://api.huobi.pro/market/trade?symbol=${this.symbol}`)
@@ -192,7 +202,7 @@ class Mentor {
     // Get 5min candlestick
     getPeriodicCandle = () => {
 
-        let stage;
+        let stage = undefined;
 
         let candles = [];
 
@@ -204,7 +214,7 @@ class Mentor {
                 const time = result.ts;
                 const minute = parseInt( moment(time).format('mm') );
 
-                if ( !stage ) {
+                if ( stage === undefined ) {
                     stage = Math.floor( minute / 5 );
                     candles.push(result);
                 } else {
@@ -239,9 +249,6 @@ class Mentor {
         line += `${this.high},`
         line += `${this.marketPrice}`
         
-        console.log("headline", headLine)
-        console.log("line", line)
-
         this.writeToFile(headLine, line)
        
         console.log ( 

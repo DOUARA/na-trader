@@ -4,11 +4,12 @@ import zlib from "zlib";
 class Socket {
     constructor (url, sub) {
         this.sub = sub;
-        this.socket = new WebSocket(url);
+        this.socket;
+        this.url = url;
     }
 
     run = ( callback ) => {
-
+        this.socket = new WebSocket(this.url);
         this.socket.onopen = (e) => {
           console.log("[open] Connection established");
           console.log("Sending to server");
@@ -25,14 +26,10 @@ class Socket {
                 zlib.unzip(event.data, (err, buffer) => {
       
                     let result = JSON.parse(buffer.toString('utf8'));
-                    //console.log(result)
+
                     if(result.tick) {
                       callback(result);
                     }
-
-                    //console.log(result);
-
-                    //console.log(result)
 
                     // send the pong
                     if(result.ping){
@@ -46,18 +43,27 @@ class Socket {
             }
         };
 
-        this.socket.onclose = function(event) {
+        this.socket.onclose = (event) => {
           if (event.wasClean) {
             console.log(event.code, event.reason);
           } else {
             // e.g. server process killed or network down
             // event.code is usually 1006 in this case
-            console.log('[close] Connection died');
+            console.log('[close] Connection died, Trying to reconnect in 1 second');
+           
           }
+
+          setTimeout( () => {
+            this.run( callback );
+          }, 1000);
+          
         };
         
-        this.socket.onerror = function(error) {
+        this.socket.onerror = (error) => {
           console.log(error);
+          setTimeout( () => {
+            this.run( callback );
+          }, 1000);
         };
 
     } // init 

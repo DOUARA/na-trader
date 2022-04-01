@@ -1,0 +1,7 @@
+version: "3"  # optional since v1.27.0
+
+services:
+  service:
+    build: .
+    volumes:
+      - ./:/usr/src/app
