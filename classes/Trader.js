@@ -79,43 +79,21 @@ class Trader {
         return json.status;
     }
 
-    placeArbitrageTrade = async (usdtAmount = 10, currency) => {
-        // Stop trading if usdt balance is < 10 
-        const usdtBalance = await this.getBalance('usdt');
-        console.log("usdt balance ", Number(usdtBalance));
-        if ( Number(usdtBalance) <= 15 ){
-            return;
-        }
-
-        let order_1, order_2, order_3;
+    precise = async (symbol, currency, amount) => {
         
-        // First order 
-        order_1 = await this.placeTrade(usdtAmount, `${currency}usdt`, 'buy-market');
-       
-        // Second order
-        console.log("order_1", order_1);
-        if( order_1 == "ok" ) {
-            let currBalance = await this.getBalance(currency);
-            currBalance = Math.floor(currBalance);
-            console.log("tnb balance ", currBalance);
-            order_2 = await this.placeTrade(currBalance, `${currency}btc`, 'sell-market');
-            console.log("order_2", order_2)
-            if(order_2 == "ok") {
-                let btcBalance = await this.getBalance('btc');
-                btcBalance = Math.floor(btcBalance * 1000000) / 1000000;
-                console.log("btcBalance", btcBalance);
-                order_3 = await this.placeTrade(btcBalance, `btcusdt`, 'sell-market');
-                console.log("order_3", order_3)
-                console.log("One Arbitrage Trade has been made, Congratulations!");
-
-            } else {
-                console.log("Order 2 have not been made! ")
-            }
+        const settings = await fetch(`https://api.huobi.pro/v1/settings/common/market-symbols?symbols=${symbol}`)
+        const json = await settings.json();
+        const { pp } = json?.data[0];
+        const { ap } = json?.data[0];
+        let result; 
+        
+        if( currency == "usdt" ) {
+            result = Math.floor(amount * (10 ** pp) ) / (10 ** pp);
         } else {
-            console.log(" Order 1 have not been made! ")
+            result = Math.floor(amount * (10 ** ap) ) / (10 ** ap);
         }
-
-        
+        console.log(result);
+        return result;
     }
 
     getBalance = async (currency) => {

@@ -6,6 +6,7 @@ class Socket {
         this.sub = sub;
         this.socket;
         this.url = url;
+        this.restart = true;
     }
 
     run = ( callback ) => {
@@ -52,23 +53,31 @@ class Socket {
             console.log('[close] Connection died, Trying to reconnect in 1 second');
            
           }
-
-          setTimeout( () => {
-            this.run( callback );
-          }, 1000);
+          
+          if( this.restart ) {
+            setTimeout( () => {
+              this.run( callback );
+            }, 1000);
+          }
+          
           
         };
         
         this.socket.onerror = (error) => {
           console.log(error);
-          setTimeout( () => {
-            this.run( callback );
-          }, 1000);
+          
+          if( this.restart ) {
+            setTimeout( () => {
+              this.run( callback );
+            }, 1000);
+          }
+
         };
 
     } // init 
 
     close = () => {
+      this.restart = false;
       this.socket.close();
       console.log("Socket has been closed!");
     }

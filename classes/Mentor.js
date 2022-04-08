@@ -4,23 +4,53 @@ import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 import fetch from 'node-fetch';
 import fs from 'fs';
+import Telegram from './Telegram.js';
 
 class Mentor {
-    constructor(symbol = 'ksmusdt', period = "5min") {
-        this.sub = `{"sub": "market.${symbol}.kline.${period}", "id": "${uuidv4()}"}`;
+    constructor(symbol = 'ksmusdt') {
+        this.sub = `{"sub": "market.${symbol}.kline.5min", "id": "${uuidv4()}"}`;
         this.symbol = symbol;
+        this.telegram = new Telegram();
+        this.valuesInit();
+    }
+
+    valuesInit = () => {
+
         this.socket = new Socket("wss://api.huobi.pro/ws", this.sub);
 
+        this.startedTradeNotify = false;
+
         this.time = 0;
+
+        this.profit = 0;
+
+        this.totalProfit = 0;
+        
         this.marketPrice = 0;
+
+        this.runningTime = 0;
+
+        this.tradingTime = 40;
+
+        this.latestAction = {
+            action: "",
+            price: 0
+        };
+
+        this.stage = undefined;
+
+        this.candles = [];
+
+        // Trade action 
+        this.tradeAction = "NO-ACTION" 
 
         // Initial values 
         this.afmax = 0.2;
         this.afmin = 0.02;
         
         this.af = {
-            prev: 0.02,
-            curr: undefined
+            prev: this.afmin,
+            curr: this.afmin
         };
 
         this.psar = {
@@ -45,9 +75,19 @@ class Mentor {
 
         this.high;
         this.low;
+        this.open;
+        this.close;
+    }
+
+    setSymbol = (symbol)=> {
+        this.sub = `{"sub": "market.${symbol}.kline.5min", "id": "${uuidv4()}"}`;
+        this.symbol = symbol;
     }
 
     init = () => {
+        this.telegram.sendMessage(
+            `New Session Has Started,%0ASymbol: ${this.symbol.toUpperCase()} 🔥`
+            )
         this.getPeriodicCandle();
     }
 
@@ -59,7 +99,7 @@ class Mentor {
 
         else if ( this.psar.curr > this.low ) {
             this.trend.curr = "down"
-        } 
+        }
 
     }
 
@@ -113,7 +153,6 @@ class Mentor {
 
     caAf = () => {
 
-        
         if( this.trend.prev == this.trend.curr ) {
             if ( this.af.prev == this.afmax) {
                 this.af.curr = this.afmax
@@ -135,11 +174,11 @@ class Mentor {
         else if( this.trend.curr == "down" && this.ep.curr >= this.ep.prev ) {
             this.af.curr = this.af.prev 
         }
-            
-         else {
+
+        else {
             this.af.curr = this.afmin;
         }
-
+            
     }
 
     caDeff = () => {
@@ -155,7 +194,7 @@ class Mentor {
 
 
     caFinalResults = async (result) => {
-
+    
         // Format the time
         const formattedTime = moment(result.ts).format('HH:mm');
         let finalTime = formattedTime;
@@ -175,6 +214,8 @@ class Mentor {
         // High and low
         this.high = result.tick?.high;
         this.low = result.tick?.low;
+        this.open = result.tick?.open;
+        this.close = result.tick?.close;
         
         // Start calculation
         this.caPsar();
@@ -188,9 +229,21 @@ class Mentor {
         const json = await marketResult.json();
         this.marketPrice = json?.tick?.data[0]?.price;
         
+        // Make Trade 
+        this.makeTrade();
+        
         // Print results 
         this.print();
 
+        // Add to running time
+        this.runningTime += 5;
+        
+        if( this.af.curr >= 1 ) {
+            this.telegram.sendMessage("af has passed: 1, script will restart... 🔄 ");
+            this.restart();
+            return;
+        }
+        
         // Normalize previous values
         this.af.prev = this.af.curr;
         this.psar.prev = this.psar.curr;
@@ -202,33 +255,30 @@ class Mentor {
     // Get 5min candlestick
     getPeriodicCandle = () => {
 
-        let stage = undefined;
-
-        let candles = [];
-
         this.socket.run( async ( result ) =>  { 
             
             if ( result?.tick ) { 
-                
+
                 // time
                 const time = result.ts;
                 const minute = parseInt( moment(time).format('mm') );
 
-                if ( stage === undefined ) {
-                    stage = Math.floor( minute / 5 );
-                    candles.push(result);
+                if ( this.stage === undefined ) {
+                    this.stage = Math.floor( minute / 5 );
+                    this.candles.push(result);
                 } else {
-                    if( Math.floor( minute / 5 ) !== stage ) {
+                
+                    if( Math.floor( minute / 5 ) !== this.stage ) {
                 
                         // Calculate final results 
-                        this.caFinalResults( candles[candles.length - 1] );
+                        this.caFinalResults( this.candles[this.candles.length - 1] );
                         
-                        candles = [];
-                        candles.push(result);
-                        stage = Math.floor( minute / 5 )
+                        this.candles = [];
+                        this.candles.push(result);
+                        this.stage = Math.floor( minute / 5 )
 
                     } else { 
-                        candles.push( result );
+                        this.candles.push( result );
                     }
                 }
 
@@ -237,17 +287,30 @@ class Mentor {
     }
 
     print = () => {
-        const headLine = "time,trend,deff,af,ep,psar,low,high,market";
+        const headLine = "time,open,high,low,close,deff,af,ep,psar,trend,market,action,rTime(min),profit,tProfit";
         
         let line = `${this.time},`
-        line += `${this.trend.curr},`
+        line += `${this.open},`
+        line += `${this.high},`
+        line += `${this.low},`
+        line += `${this.close},`
         line += `${this.deff_asset.curr},`
         line += `${this.af.curr},`
         line += `${this.ep.curr},`
         line += `${this.psar.curr},`
-        line += `${this.low},`
-        line += `${this.high},`
-        line += `${this.marketPrice}`
+        line += `${this.trend.curr},`
+        line += `${this.marketPrice},`
+        line += `${this.tradeAction},`
+        line += `${this.runningTime},`
+        if(this.tradeAction === "SELL") {
+            line += `${this.profit},`
+            line += `${this.totalProfit}`
+            
+        } else {
+            line += "N/A,"
+            line += `N/A`
+        }
+        
         
         this.writeToFile(headLine, line)
        
@@ -260,7 +323,11 @@ class Mentor {
             this.psar.curr, 
             this.low, 
             this.high, 
-            this.marketPrice 
+            this.marketPrice, 
+            this.tradeAction,
+            this.runningTime,
+            this.profit,
+            this.totalProfit
         )
     
     }
@@ -289,6 +356,99 @@ class Mentor {
         } catch(err) {
             console.error(err)
         }
+    }
+
+    stop = () => {
+        
+        if( this.latestAction.action == "BUY" ) {
+            this.sell();
+            this.writeToFile("Selling Headline", "Selling Before Restart Done!")
+        }
+
+        this.telegram.sendMessage("Script Has Stopped!");
+
+        this.socket.close();
+
+        console.log("Script Has Stopped...");
+
+        let profitPercentage = Math.floor(this.totalProfit * 100) / 100;
+        if(profitPercentage < 0) {
+            profitPercentage += " 🖕 😀"
+        } else {
+            profitPercentage += " 👏 👏"
+        }
+
+        this.telegram.sendMessage(`
+            Session Has Closed with a profit of ${profitPercentage}
+        `);
+
+
+    }
+
+    start = () => {
+        this.valuesInit();
+
+        this.writeToFile("start headline", "start")
+
+        this.init();
+    }
+
+
+    restart = () => {
+        this.stop();
+        this.start();
+    }
+
+    makeTrade = () => {
+        if( this.runningTime >= this.tradingTime ) {
+            
+            if( !this.startedTradeNotify ) {
+                this.telegram.sendMessage(`We have passed ${this.tradingTime}min,%0Ascript will start trading now! stay tuned 🔥🔥🔥`)
+                this.startedTradeNotify = true;
+            }
+
+            if(this.trend.curr == "up") {
+                if(this.trend.prev == "down") {
+                    this.buy();
+                } else {
+                    this.tradeAction = "NO-ACTION"
+                } 
+            } else {
+                if(this.trend.prev == "up" && this.latestAction.action == "BUY") {
+                    this.sell();
+                } else {
+                    this.tradeAction = "NO-ACTION"
+                }  
+            }
+        } else {
+            this.tradeAction = "NO-ACTION"
+        }
+    }
+
+
+    buy = () => {
+        this.latestAction.action = "BUY";
+        this.latestAction.price = this.marketPrice;
+        this.tradeAction = "BUY"
+        this.telegram.sendMessage(`BUY at price ${this.latestAction.price}`);
+    }
+
+    sell = () => {
+        this.profit = ( ( this.marketPrice - this.latestAction.price ) / this.latestAction.price ) * 100;
+        this.totalProfit += this.profit;
+        this.latestAction.action = "SELL";
+        this.latestAction.price = 0;
+        this.tradeAction = "SELL";
+
+        let profitPercentage = Math.floor(this.profit * 100) / 100;
+        if(profitPercentage < 0) {
+            profitPercentage += " 🖕 😀"
+        } else {
+            profitPercentage += " 👏 👏"
+        }
+        let message = `SELL at price: ${this.marketPrice},%0A with a profit of: ${profitPercentage},%0A profit so far: ${Math.floor(this.totalProfit * 100) / 100}`
+        
+        this.telegram.sendMessage(message);
     }
 }
 
