@@ -7,11 +7,37 @@ import fs from 'fs';
 import Telegram from './Telegram.js';
 
 class Mentor {
-    constructor(symbol = 'ksmusdt') {
-        this.sub = `{"sub": "market.${symbol}.kline.5min", "id": "${uuidv4()}"}`;
-        this.symbol = symbol;
+    constructor() {
         this.telegram = new Telegram();
-        this.valuesInit();
+        this.status = "off";
+        this.profitEmoji = "✅✅"
+        this.looseEmoji = "⛔️⛔️";
+        this.tradingTime = 40;
+        this.type = "data-collecting";
+    }
+    
+    getInfo = () => {
+        return {
+            status: this.status,
+            sessionId: this.sessionId,
+            symbol: this.symbol,
+            type: this.type,
+            tradingTime: this.tradingTime
+        }
+    }
+
+    setType = ( type ) => {
+        this.type = type;
+    }
+
+    setSymbol = ( symbol ) => {
+        this.sessionId = uuidv4().slice(0, 7);
+        this.sub = `{"sub": "market.${symbol}.kline.5min", "id": "${this.sessionId}"}`;
+        this.symbol = symbol;
+    }
+
+    setTradingTime = ( time ) => {
+        this.tradingTime = time;
     }
 
     valuesInit = () => {
@@ -29,8 +55,6 @@ class Mentor {
         this.marketPrice = 0;
 
         this.runningTime = 0;
-
-        this.tradingTime = 40;
 
         this.latestAction = {
             action: "",
@@ -77,18 +101,6 @@ class Mentor {
         this.low;
         this.open;
         this.close;
-    }
-
-    setSymbol = (symbol)=> {
-        this.sub = `{"sub": "market.${symbol}.kline.5min", "id": "${uuidv4()}"}`;
-        this.symbol = symbol;
-    }
-
-    init = () => {
-        this.telegram.sendMessage(
-            `New Session Has Started,%0ASymbol: ${this.symbol.toUpperCase()} 🔥`
-            )
-        this.getPeriodicCandle();
     }
 
     caTrend = () => {
@@ -239,8 +251,10 @@ class Mentor {
         this.runningTime += 5;
         
         if( this.af.curr >= 1 ) {
-            this.telegram.sendMessage("af has passed: 1, script will restart... 🔄 ");
-            this.restart();
+            this.telegram.sendMessage("af has passed: 1, script is restarting... 🔄 ");
+            this.writeToFile("", "Af has passed 1, restart");
+            this.stop();
+            this.start();
             return;
         }
         
@@ -332,7 +346,7 @@ class Mentor {
     
     }
 
-    writeToFile = (headline, line) => {
+    writeToFile = ( headline, line ) => {
         const currentDate = moment().format('YYYY-MM-DD')
         const fileName = `${currentDate}_${this.symbol}.txt`
         
@@ -359,51 +373,53 @@ class Mentor {
     }
 
     stop = () => {
+
+        this.status = "off";
         
+        // Sell currency if there's any
         if( this.latestAction.action == "BUY" ) {
             this.sell();
-            this.writeToFile("Selling Headline", "Selling Before Restart Done!")
+            this.writeToFile("", "Selling Before Restart Done!")
         }
 
-        this.telegram.sendMessage("Script Has Stopped!");
-
+        // Close the socket 
         this.socket.close();
 
         console.log("Script Has Stopped...");
 
+        // Notify Telegram
+        this.telegram.sendMessage("Script Has Stopped!");
+
         let profitPercentage = Math.floor(this.totalProfit * 100) / 100;
-        if(profitPercentage < 0) {
-            profitPercentage += " 🖕 😀"
+        if( profitPercentage < 0 ) {
+            profitPercentage += ` ${this.looseEmoji}`;
         } else {
-            profitPercentage += " 👏 👏"
+            profitPercentage += ` ${this.profitEmoji}`;
         }
 
         this.telegram.sendMessage(`
-            Session Has Closed with a profit of ${profitPercentage}
+            Session Has Closed with a profit of ${profitPercentage}%
         `);
-
 
     }
 
     start = () => {
+        this.status = "on";
+        
         this.valuesInit();
 
-        this.writeToFile("start headline", "start")
+        this.telegram.sendMessage(
+            `New Session Has Started 🏃🏽‍♂️ %0ASymbol: ${this.symbol.toUpperCase()} %0AID: ${this.sessionId}`
+        );
 
-        this.init();
-    }
-
-
-    restart = () => {
-        this.stop();
-        this.start();
+        this.getPeriodicCandle();
     }
 
     makeTrade = () => {
         if( this.runningTime >= this.tradingTime ) {
             
             if( !this.startedTradeNotify ) {
-                this.telegram.sendMessage(`We have passed ${this.tradingTime}min,%0Ascript will start trading now! stay tuned 🔥🔥🔥`)
+                this.telegram.sendMessage(`We have passed ${this.tradingTime}mins,%0Ascript will start trading now! stay tuned 🔥🔥🔥`)
                 this.startedTradeNotify = true;
             }
 
@@ -442,11 +458,11 @@ class Mentor {
 
         let profitPercentage = Math.floor(this.profit * 100) / 100;
         if(profitPercentage < 0) {
-            profitPercentage += " 🖕 😀"
+            profitPercentage += ` ${this.looseEmoji}`;
         } else {
-            profitPercentage += " 👏 👏"
+            profitPercentage += ` ${this.profitEmoji}`;
         }
-        let message = `SELL at price: ${this.marketPrice},%0A with a profit of: ${profitPercentage},%0A profit so far: ${Math.floor(this.totalProfit * 100) / 100}`
+        let message = `SELL at price: ${this.marketPrice},%0Awith a profit of: ${profitPercentage}%,%0Aprofit so far: ${Math.floor(this.totalProfit * 100) / 100}%`
         
         this.telegram.sendMessage(message);
     }

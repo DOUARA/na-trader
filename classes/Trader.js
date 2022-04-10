@@ -8,7 +8,6 @@ class Trader {
         this.secretKey = "";
         this.accountID = "47737782";
         this.domain = "api.huobi.pro";
-        this.stopLimit = 15;
     }
 
     getTimeStamp = () => {
