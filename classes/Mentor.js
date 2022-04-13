@@ -13,7 +13,8 @@ class Mentor {
         this.profitEmoji = "✅✅"
         this.looseEmoji = "⛔️⛔️";
         this.tradingTime = 40;
-        this.type = "data-collecting";
+        this.type = "data-collection";
+        this.trader = new Trader();
     }
     
     getInfo = () => {
@@ -392,13 +393,13 @@ class Mentor {
 
         let profitPercentage = Math.floor(this.totalProfit * 100) / 100;
         if( profitPercentage < 0 ) {
-            profitPercentage += ` ${this.looseEmoji}`;
+            profitPercentage += `% ${this.looseEmoji}`;
         } else {
-            profitPercentage += ` ${this.profitEmoji}`;
+            profitPercentage += `% ${this.profitEmoji}`;
         }
 
         this.telegram.sendMessage(`
-            Session Has Closed with a profit of ${profitPercentage}%
+            Session Has Closed 🧎‍♂️ %0Aprofit: ${profitPercentage} %0AID: ${this.sessionId}
         `);
 
     }
@@ -409,7 +410,7 @@ class Mentor {
         this.valuesInit();
 
         this.telegram.sendMessage(
-            `New Session Has Started 🏃🏽‍♂️ %0ASymbol: ${this.symbol.toUpperCase()} %0AID: ${this.sessionId}`
+            `New Session Has Started 🏃🏽‍♂️ %0ASymbol: ${this.symbol.toUpperCase()} %0AID: ${this.sessionId} %0ATrading Time: ${this.tradingTime} %0AType: ${this.type}`
         );
 
         this.getPeriodicCandle();
@@ -443,6 +444,9 @@ class Mentor {
 
 
     buy = () => {
+        if( this.type == "real-trading" ) {
+            this.trader.placeTradeAll(this.symbol, "buy-market")
+        }
         this.latestAction.action = "BUY";
         this.latestAction.price = this.marketPrice;
         this.tradeAction = "BUY"
@@ -450,6 +454,10 @@ class Mentor {
     }
 
     sell = () => {
+        if( this.type == "real-trading" ) {
+            this.trader.placeTradeAll(this.symbol, "sell-market")
+        }
+
         this.profit = ( ( this.marketPrice - this.latestAction.price ) / this.latestAction.price ) * 100;
         this.totalProfit += this.profit;
         this.latestAction.action = "SELL";
@@ -458,11 +466,11 @@ class Mentor {
 
         let profitPercentage = Math.floor(this.profit * 100) / 100;
         if(profitPercentage < 0) {
-            profitPercentage += ` ${this.looseEmoji}`;
+            profitPercentage += `% ${this.looseEmoji}`;
         } else {
-            profitPercentage += ` ${this.profitEmoji}`;
+            profitPercentage += `% ${this.profitEmoji}`;
         }
-        let message = `SELL at price: ${this.marketPrice},%0Awith a profit of: ${profitPercentage}%,%0Aprofit so far: ${Math.floor(this.totalProfit * 100) / 100}%`
+        let message = `SELL at price: ${this.marketPrice},%0Awith a profit of: ${profitPercentage},%0Aprofit so far: ${Math.floor(this.totalProfit * 100) / 100}%`
         
         this.telegram.sendMessage(message);
     }

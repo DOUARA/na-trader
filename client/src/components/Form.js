@@ -8,7 +8,7 @@ const Form = ( {setRenderTable } ) => {
     const [symbol, setSymbol] = useState();
     const [type, setType] = useState( { value: 'data-collection', label: 'Data Collection' });
     const [tradingTime, setTradingTime] = useState(40);
-    console.log(type);
+
     const typeOptions = [
         { value: 'data-collection', label: 'Data Collection' },
         { value: 'real-trading', label: 'Real Trading' }
@@ -26,7 +26,7 @@ const Form = ( {setRenderTable } ) => {
         });
 
         start = await start.json();
-        if(start.success == "ok") {
+        if( start.success == "ok" ) {
             setRenderTable(true)
         }   
     }

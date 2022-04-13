@@ -1,4 +1,5 @@
 import Mentor from './classes/Mentor.js';
+import path from 'path'
 
 const aMentor = new Mentor();
 
@@ -8,6 +9,8 @@ const app = express()
 
 // MiddleWares
 app.use(express.json({ extended: true }));
+
+app.use('/', express.static(path.join("client", 'build')))
 
 app.get('/api/info', (req, res) => {
   try {

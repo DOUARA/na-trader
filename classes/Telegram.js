@@ -7,7 +7,7 @@ class Telegram {
     }
 
     sendMessage = async ( message ) => {
-       /*
+
         try {
             const result = await fetch(`https://api.telegram.org/bot${this.key}/sendMessage?chat_id=${this.channelName}&text=${message}`);
             const json = await result.json();
@@ -15,7 +15,6 @@ class Telegram {
         } catch(err) {
             console.error(err);
         }
-        */
 
     }
 }

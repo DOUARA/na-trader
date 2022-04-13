@@ -4,9 +4,9 @@ import fetch from 'node-fetch';
 
 class Trader {
     constructor(){
-        this.accessKey = "";
-        this.secretKey = "";
-        this.accountID = "47737782";
+        this.accessKey = "vqgdf4gsga-d05b2270-83108a8c-62a2f";
+        this.secretKey = "2ee0e5bf-f5f69117-d6f2c0a7-b985a";
+        this.accountID = "47063580";
         this.domain = "api.huobi.pro";
     }
 
@@ -54,9 +54,25 @@ class Trader {
         return url;
     }
 
+    placeTradeAll = ( symbol, type ) => {
+        
+        if( type == "buy-market") {
+            let usdtBalance = this.getBalance("usdt");
+            usdtBalance = this.precise(symbol, "usdt", usdtBalance);
+            this.placeTrade(usdtBalance, symbol, "buy-market")
+        }
+
+        if( type == "sell-market ") {
+            const currency = symbol.replace("usdt", "");
+            let currencyBalance = this.getBalance(currency);
+            currencyBalance = this.precise(symbol, currency, currencyBalance);
+            this.placeTrade(currencyBalance, symbol, "sell-market")
+        }
+    }
+
     placeTrade = async ( amount, symbol, type ) => {
         
-        const orderDetails ={
+        const orderDetails = {
             "account-id": this.accountID,
             "amount": amount,
             "symbol": symbol,
@@ -67,18 +83,19 @@ class Trader {
         const tradeUrl = this.generateApiUrl("POST", "/v1/order/orders/place");
         
         const result = await fetch( tradeUrl, {
-            method: 'POST', 
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(orderDetails)
-        }
+                method: 'POST', 
+                headers: {
+                'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(orderDetails)
+            }
         );
+
         const json = await result.json();
         return json.status;
     }
 
-    precise = async (symbol, currency, amount) => {
+    precise = async ( symbol, currency, amount ) => {
         
         const settings = await fetch(`https://api.huobi.pro/v1/settings/common/market-symbols?symbols=${symbol}`)
         const json = await settings.json();
@@ -102,6 +119,13 @@ class Trader {
         const balancesList = json.data.list;
         const { balance } = balancesList.filter((obj) => obj.currency === currency && obj.type === "trade")[0];
         return balance;
+    }
+
+    getAccountID = async () => {
+        const url = this.generateApiUrl("GET", "/v1/account/accounts");
+        const result = await fetch( url )
+        const json = await result.json();
+        console.log(json);
     }
 }
 

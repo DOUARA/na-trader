@@ -5,3 +5,5 @@ services:
     build: .
     volumes:
       - ./:/usr/src/app
+    ports:
+      - 127.0.0.1:4000:4000

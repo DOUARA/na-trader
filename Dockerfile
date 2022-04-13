@@ -15,3 +15,5 @@ RUN npm install
 # RUN npm ci --only=production
 
 CMD [ "npm", "start" ]
+
+EXPOSE 4000

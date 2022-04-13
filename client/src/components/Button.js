@@ -1,7 +1,14 @@
 import styled from "styled-components";
 
 const Button = ({text, onClick, type}) => {
-    return <StyledButton type={type || "button"} onClick={onClick}>{text}</StyledButton>
+    const clickHandle = (event) => {
+        if ( window.confirm('Are you sure to perform this action?') ) {
+            onClick();
+        }
+       
+        event.preventDefault()
+    }
+    return <StyledButton type={type || "button"} onClick={clickHandle}>{text}</StyledButton>
 }
 
 
@@ -10,7 +17,7 @@ const StyledButton = styled.button`
     padding: 20px;
     font-size: 18px;
     cursor: pointer;
-    margin-top: 50px;
+    margin:40px auto;
 `
 
 export default Button;
