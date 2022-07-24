@@ -4,9 +4,9 @@ import fetch from 'node-fetch';
 
 class Trader {
     constructor(){
-        this.accessKey = "vqgdf4gsga-d05b2270-83108a8c-62a2f";
-        this.secretKey = "2ee0e5bf-f5f69117-d6f2c0a7-b985a";
-        this.accountID = "47063580";
+        this.accessKey = "{ACCESS_KEY}";
+        this.secretKey = "{SECRET_KEY}";
+        this.accountID = "{ACCOUNT_ID}";
         this.domain = "api.huobi.pro";
     }
 
